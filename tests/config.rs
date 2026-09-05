@@ -1,5 +1,5 @@
 use pm::config::Config;
-use pm::model::{Depth, PermissionLevel, Preset};
+use pm::model::{Constraints, Depth, PermissionLevel, Preset};
 use pm::prompt::Lang;
 
 #[test]
@@ -10,9 +10,10 @@ fn default_config_matches_fix_defaults() {
     assert_eq!(config.default_depth(), Depth::Normal);
     assert_eq!(config.default_scope(), pm::model::Scope::Auto);
     assert_eq!(config.lang(), Lang::Zh);
-    assert!(config.constraints.no_unrelated_changes);
-    assert!(config.constraints.no_new_files);
-    assert!(!config.constraints.run_tests);
+    let resolved = config.constraints.resolve(Constraints::default());
+    assert!(resolved.no_unrelated_changes);
+    assert!(resolved.no_new_files);
+    assert!(!resolved.run_tests);
     assert!(config.custom_presets.is_empty());
 }
 
@@ -56,8 +57,9 @@ extra_rules = [
     assert!(warning.is_none());
     assert_eq!(config.default_preset(), Preset::Fix);
     assert_eq!(config.default_permission(), PermissionLevel::Minimal);
-    assert!(!config.constraints.run_tests);
-    assert!(config.constraints.no_unrelated_changes);
+    let resolved = config.constraints.resolve(Constraints::default());
+    assert!(!resolved.run_tests);
+    assert!(resolved.no_unrelated_changes);
 
     let cp = config.resolve_custom("legacy-fix").expect("custom preset");
     assert_eq!(cp.base, Preset::Fix);
@@ -113,15 +115,13 @@ fn partial_constraints_table_inherits_defaults() {
     let (config, warning) = Config::from_toml(text);
     assert!(warning.is_none());
     assert_eq!(config.lang(), Lang::En);
-    assert!(config.constraints.run_tests, "explicit value kept");
+    let resolved = config.constraints.resolve(Constraints::default());
+    assert!(resolved.run_tests, "explicit value kept");
     assert!(
-        config.constraints.no_unrelated_changes,
+        resolved.no_unrelated_changes,
         "missing field inherits default"
     );
-    assert!(
-        config.constraints.no_new_files,
-        "missing field inherits default"
-    );
+    assert!(resolved.no_new_files, "missing field inherits default");
 }
 
 #[test]
@@ -129,4 +129,39 @@ fn empty_file_is_valid_defaults() {
     let (config, warning) = Config::from_toml("");
     assert!(warning.is_none());
     assert_eq!(config, Config::default());
+}
+
+#[test]
+fn explicit_false_is_kept_apart_from_unset() {
+    // Explicit false wins over a strict base ...
+    let (config, warning) = Config::from_toml("[constraints]\nno_new_files = false\n");
+    assert!(warning.is_none());
+    assert!(
+        !config
+            .constraints
+            .resolve(Constraints::default())
+            .no_new_files
+    );
+    // ... while an unset field follows each preset's own default.
+    assert!(
+        !config
+            .constraints
+            .resolve(Constraints::for_preset(Preset::Refactor))
+            .no_new_files
+    );
+    assert!(
+        config
+            .constraints
+            .resolve(Constraints::default())
+            .no_unrelated_changes
+    );
+
+    // Explicit true wins over a relaxed preset.
+    let (config, _) = Config::from_toml("[constraints]\nno_new_files = true\n");
+    assert!(
+        config
+            .constraints
+            .resolve(Constraints::for_preset(Preset::Refactor))
+            .no_new_files
+    );
 }

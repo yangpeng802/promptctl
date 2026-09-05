@@ -17,7 +17,7 @@ pub struct Config {
     pub default_depth: String,
     pub default_scope: String,
     pub language: String,
-    pub constraints: Constraints,
+    pub constraints: PartialConstraints,
     pub custom_presets: Vec<CustomPresetRaw>,
 }
 
@@ -29,8 +29,68 @@ impl Default for Config {
             default_depth: "normal".to_string(),
             default_scope: "auto".to_string(),
             language: "zh".to_string(),
-            constraints: Constraints::default(),
+            constraints: PartialConstraints::default(),
             custom_presets: Vec::new(),
+        }
+    }
+}
+
+/// Config-file form of constraints: every field is optional so "unset" stays
+/// distinct from an explicit true/false. Unset fields inherit the active
+/// preset's defaults; explicit values win. The TOML shape is unchanged, so
+/// existing `config.toml` files keep working as-is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct PartialConstraints {
+    pub no_unrelated_changes: Option<bool>,
+    pub no_unnecessary_refactor: Option<bool>,
+    pub preserve_public_interfaces: Option<bool>,
+    pub preserve_coding_style: Option<bool>,
+    pub analyze_before_modifying: Option<bool>,
+    pub build_after_modifying: Option<bool>,
+    pub run_tests: Option<bool>,
+    pub no_new_files: Option<bool>,
+    pub no_dependency_changes: Option<bool>,
+    pub no_unrelated_formatting: Option<bool>,
+    pub explain_root_cause: Option<bool>,
+    pub explain_modifications: Option<bool>,
+    pub list_remaining_risks: Option<bool>,
+}
+
+impl PartialConstraints {
+    /// Fill unset fields from `base`, keeping explicit user choices.
+    pub fn resolve(&self, base: Constraints) -> Constraints {
+        let p = self;
+        Constraints {
+            no_unrelated_changes: p.no_unrelated_changes.unwrap_or(base.no_unrelated_changes),
+            no_unnecessary_refactor: p
+                .no_unnecessary_refactor
+                .unwrap_or(base.no_unnecessary_refactor),
+            preserve_public_interfaces: p
+                .preserve_public_interfaces
+                .unwrap_or(base.preserve_public_interfaces),
+            preserve_coding_style: p
+                .preserve_coding_style
+                .unwrap_or(base.preserve_coding_style),
+            analyze_before_modifying: p
+                .analyze_before_modifying
+                .unwrap_or(base.analyze_before_modifying),
+            build_after_modifying: p
+                .build_after_modifying
+                .unwrap_or(base.build_after_modifying),
+            run_tests: p.run_tests.unwrap_or(base.run_tests),
+            no_new_files: p.no_new_files.unwrap_or(base.no_new_files),
+            no_dependency_changes: p
+                .no_dependency_changes
+                .unwrap_or(base.no_dependency_changes),
+            no_unrelated_formatting: p
+                .no_unrelated_formatting
+                .unwrap_or(base.no_unrelated_formatting),
+            explain_root_cause: p.explain_root_cause.unwrap_or(base.explain_root_cause),
+            explain_modifications: p
+                .explain_modifications
+                .unwrap_or(base.explain_modifications),
+            list_remaining_risks: p.list_remaining_risks.unwrap_or(base.list_remaining_risks),
         }
     }
 }
@@ -167,8 +227,9 @@ mod tests {
         assert_eq!(c.default_depth(), Depth::Normal);
         assert_eq!(c.default_scope(), Scope::Auto);
         assert_eq!(c.lang(), Lang::Zh);
-        assert!(c.constraints.no_unrelated_changes);
-        assert!(!c.constraints.run_tests);
+        let resolved = c.constraints.resolve(Constraints::default());
+        assert!(resolved.no_unrelated_changes);
+        assert!(!resolved.run_tests);
         assert!(c.custom_presets.is_empty());
     }
 
@@ -198,9 +259,10 @@ mod tests {
         "#;
         let (config, warning) = Config::from_toml(text);
         assert!(warning.is_none());
-        assert!(config.constraints.run_tests);
+        let resolved = config.constraints.resolve(Constraints::default());
+        assert!(resolved.run_tests);
         // fields absent from [constraints] keep their default
-        assert!(config.constraints.no_unrelated_changes);
+        assert!(resolved.no_unrelated_changes);
         let cp = config.resolve_custom("legacy-fix").expect("custom preset");
         assert_eq!(cp.base, Preset::Fix);
         assert_eq!(cp.permission, Some(PermissionLevel::Minimal));
@@ -246,5 +308,35 @@ mod tests {
         assert_eq!(config, Config::default());
         let warning = warning.expect("warning expected");
         assert!(warning.contains("config parse failed"));
+    }
+
+    #[test]
+    fn partial_constraints_distinguish_unset_from_explicit() {
+        // Unset fields inherit the given base (here: refactor relaxations).
+        let empty = PartialConstraints::default();
+        let out = empty.resolve(Constraints::for_preset(Preset::Refactor));
+        assert!(!out.no_new_files);
+        assert!(out.run_tests);
+        // The same empty patch over the FIX baseline keeps strict values.
+        let out = empty.resolve(Constraints::default());
+        assert!(out.no_new_files);
+        assert!(!out.run_tests);
+
+        // An explicit false wins even where the base says true ...
+        let patch = PartialConstraints {
+            no_new_files: Some(false),
+            ..PartialConstraints::default()
+        };
+        assert!(!patch.resolve(Constraints::default()).no_new_files);
+        // ... and an explicit true wins where the base says false.
+        let patch = PartialConstraints {
+            no_new_files: Some(true),
+            ..PartialConstraints::default()
+        };
+        assert!(
+            patch
+                .resolve(Constraints::for_preset(Preset::Refactor))
+                .no_new_files
+        );
     }
 }

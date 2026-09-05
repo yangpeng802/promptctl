@@ -176,7 +176,7 @@ fn generate(
         depth,
         scope,
         selected_files,
-        constraints: resolve_constraints(config.constraints, preset),
+        constraints: config.constraints.resolve(Constraints::for_preset(preset)),
         extra_rules,
         language: config.lang(),
     };
@@ -192,6 +192,8 @@ fn generate(
         depth: depth.key().to_string(),
         scope: scope.key().to_string(),
         extra_rules: request.extra_rules.clone(),
+        constraints: request.constraints,
+        selected_files: request.selected_files.clone(),
     });
     let _ = history.save();
 
@@ -231,60 +233,4 @@ fn resolve_task(args: &[String]) -> String {
         }
     }
     task.trim().to_string()
-}
-
-/// CLI has no interactive preset switching, so start from the preset's own
-/// defaults and apply the user's config-file customizations on top.
-///
-/// A config field counts as customized when it differs from the FIX baseline
-/// (the config schema default); untouched fields follow the preset. This
-/// keeps `pm refactor` / `pm yolo` consistent with the TUI instead of
-/// forbidding what the working mode allows (e.g. new files).
-fn resolve_constraints(config: Constraints, preset: Preset) -> Constraints {
-    let mut out = Constraints::for_preset(preset);
-    let baseline = Constraints::default();
-    for i in 0..Constraints::LABELS.len() {
-        if config.get(i) != baseline.get(i) {
-            out.set(i, config.get(i));
-        }
-    }
-    out
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn fix_keeps_config_baseline() {
-        let out = resolve_constraints(Constraints::default(), Preset::Fix);
-        assert_eq!(out, Constraints::default());
-    }
-
-    #[test]
-    fn refactor_and_yolo_follow_preset_defaults() {
-        let out = resolve_constraints(Constraints::default(), Preset::Refactor);
-        assert_eq!(out, Constraints::for_preset(Preset::Refactor));
-        assert!(!out.no_new_files);
-        assert!(out.run_tests);
-
-        let out = resolve_constraints(Constraints::default(), Preset::Yolo);
-        assert_eq!(out, Constraints::for_preset(Preset::Yolo));
-        assert!(!out.no_new_files);
-    }
-
-    #[test]
-    fn explicit_config_customization_wins_over_preset() {
-        let config = Constraints {
-            run_tests: true,
-            ..Constraints::default()
-        };
-        let out = resolve_constraints(config, Preset::Fix);
-        assert!(out.run_tests);
-        assert!(out.no_new_files);
-
-        // The same user preference carries over to other presets.
-        let out = resolve_constraints(config, Preset::Analyze);
-        assert!(out.run_tests);
-    }
 }

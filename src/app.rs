@@ -281,7 +281,7 @@ impl App {
             permission: config.default_permission(),
             depth: config.default_depth(),
             scope: config.default_scope(),
-            constraints: config.constraints,
+            constraints: config.constraints.resolve(Constraints::default()),
             constraint_sel: 0,
             focus: Focus::Task,
             editing: false,
@@ -478,6 +478,8 @@ impl App {
             depth: self.depth.key().to_string(),
             scope: self.scope.key().to_string(),
             extra_rules: parse_lines(&self.extra_rules.text),
+            constraints: self.constraints,
+            selected_files: parse_entries(&self.files.text),
         };
         self.history.push(item);
         let _ = self.history.save();
@@ -501,6 +503,8 @@ impl App {
             self.scope = s;
         }
         self.extra_rules = TextArea::from_text(&item.extra_rules.join("\n"));
+        self.constraints = item.constraints;
+        self.files = TextArea::from_text(&item.selected_files.join("\n"));
         self.preview_scroll = 0;
         self.set_status("✓ History restored", false);
     }
@@ -951,6 +955,32 @@ mod tests {
         assert_eq!(app.permission, PermissionLevel::ReadOnly);
         assert!(!app.constraints.run_tests);
         assert!(!app.dirty.permission);
+    }
+
+    #[test]
+    fn history_restore_brings_back_constraints_and_files() {
+        let mut app = App::new(Config::default(), History::default(), PresetHint::None);
+        let constraints = Constraints {
+            run_tests: true,
+            no_new_files: false,
+            ..Constraints::default()
+        };
+        app.history.push(HistoryItem {
+            task: "修复问题".to_string(),
+            preset: "fix".to_string(),
+            permission: "minimal".to_string(),
+            depth: "deep".to_string(),
+            scope: "auto".to_string(),
+            extra_rules: vec![],
+            constraints,
+            selected_files: vec!["src/a.rs".to_string(), "src/b.rs".to_string()],
+        });
+        app.history_sel = 0;
+        app.restore_history();
+        assert!(app.constraints.run_tests);
+        assert!(!app.constraints.no_new_files);
+        assert_eq!(app.files.text, "src/a.rs\nsrc/b.rs");
+        assert_eq!(app.depth, Depth::Deep);
     }
 
     #[test]

@@ -1,4 +1,5 @@
 use pm::history::{History, HistoryItem, MAX_ITEMS};
+use pm::model::Constraints;
 
 fn item(task: &str) -> HistoryItem {
     HistoryItem {
@@ -8,6 +9,8 @@ fn item(task: &str) -> HistoryItem {
         depth: "normal".to_string(),
         scope: "auto".to_string(),
         extra_rules: vec![],
+        constraints: Constraints::default(),
+        selected_files: vec![],
     }
 }
 
@@ -42,10 +45,13 @@ fn serializes_to_history_json_shape() {
         depth: "deep".to_string(),
         scope: "repo".to_string(),
         extra_rules: vec!["不要使用 unsafe".to_string()],
+        constraints: Constraints::default(),
+        selected_files: vec!["src/main.rs".to_string()],
     });
     let json = serde_json::to_string(&history.items).unwrap();
     let parsed: Vec<HistoryItem> = serde_json::from_str(&json).unwrap();
     assert_eq!(parsed, history.items);
+    assert_eq!(parsed[0].selected_files, vec!["src/main.rs"]);
     // Fields required by the spec are present in the JSON object.
     let value: serde_json::Value = serde_json::from_str(&json).unwrap();
     let first = &value[0];
@@ -56,7 +62,26 @@ fn serializes_to_history_json_shape() {
         "depth",
         "scope",
         "extra_rules",
+        "constraints",
+        "selected_files",
     ] {
         assert!(first.get(key).is_some(), "missing field {key}");
     }
+}
+
+#[test]
+fn old_records_without_new_fields_load_with_defaults() {
+    // history.json written before constraints/selected_files existed.
+    let json = r#"[{
+        "task": "旧任务",
+        "preset": "fix",
+        "permission": "minimal",
+        "depth": "normal",
+        "scope": "auto",
+        "extra_rules": []
+    }]"#;
+    let items: Vec<HistoryItem> = serde_json::from_str(json).unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].constraints, Constraints::default());
+    assert!(items[0].selected_files.is_empty());
 }

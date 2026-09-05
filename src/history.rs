@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::config::Config;
+use crate::model::Constraints;
 
 /// History keeps the last 20 generations (task + parameters only, never code).
 pub const MAX_ITEMS: usize = 20;
@@ -17,6 +18,13 @@ pub struct HistoryItem {
     pub scope: String,
     #[serde(default)]
     pub extra_rules: Vec<String>,
+    /// Constraints in effect when the prompt was generated. Defaults to the
+    /// FIX baseline for records written before this field existed.
+    #[serde(default)]
+    pub constraints: Constraints,
+    /// Files the generation was limited to. Empty for older records.
+    #[serde(default)]
+    pub selected_files: Vec<String>,
 }
 
 #[derive(Debug, Default)]
@@ -81,6 +89,8 @@ mod tests {
             depth: "normal".to_string(),
             scope: "auto".to_string(),
             extra_rules: vec![],
+            constraints: Constraints::default(),
+            selected_files: vec![],
         }
     }
 
@@ -116,6 +126,8 @@ mod tests {
             depth: "deep".to_string(),
             scope: "repo".to_string(),
             extra_rules: vec!["必须兼容现有构建环境".to_string()],
+            constraints: Constraints::default(),
+            selected_files: vec!["src/main.rs".to_string()],
         });
         let json = serde_json::to_string_pretty(&h.items).unwrap();
         let items: Vec<HistoryItem> = serde_json::from_str(&json).unwrap();
