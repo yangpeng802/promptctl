@@ -115,7 +115,7 @@ mod tests {
             permission: "readonly".to_string(),
             depth: "deep".to_string(),
             scope: "repo".to_string(),
-            extra_rules: vec!["必须兼容 GCC 4.8".to_string()],
+            extra_rules: vec!["必须兼容现有构建环境".to_string()],
         });
         let json = serde_json::to_string_pretty(&h.items).unwrap();
         let items: Vec<HistoryItem> = serde_json::from_str(&json).unwrap();

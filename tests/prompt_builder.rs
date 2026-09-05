@@ -97,12 +97,12 @@ fn yolo_allows_modification_without_conflicting_text() {
 fn extra_rules_get_their_own_section() {
     let mut request = req(Preset::Fix, PermissionLevel::Minimal);
     request.extra_rules = vec![
-        "必须兼容 GCC 4.8".to_string(),
+        "必须兼容现有构建环境".to_string(),
         "不要使用 shared_mutex".to_string(),
     ];
     let prompt = PromptBuilder::build(&request);
     assert!(prompt.contains("# 附加约束"));
-    assert!(prompt.contains("- 必须兼容 GCC 4.8"));
+    assert!(prompt.contains("- 必须兼容现有构建环境"));
     assert!(prompt.contains("- 不要使用 shared_mutex"));
 }
 

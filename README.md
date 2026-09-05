@@ -1,7 +1,7 @@
 # pm — Prompt Maker
 
 `pm` 是一个本地、离线、启动即用的 CLI/TUI 小工具，用来为 Coding Agent
-（Zcode、OpenCode、Codex、Claude Code 等）快速生成结构化、约束明确的任务
+（OpenCode、Codex、Claude Code 等）快速生成结构化、约束明确的任务
 Prompt。
 
 它不聊天、不调用 LLM、不执行代码。它只做一件事：把你的任务描述和一组

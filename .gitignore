@@ -1,4 +1,8 @@
 /target
 Cargo.lock.bak
 *.swp
+*.orig
+*.rej
 .DS_Store
+.idea/
+.vscode/

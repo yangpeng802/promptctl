@@ -47,9 +47,9 @@ permission = "minimal"
 depth = "deep"
 
 extra_rules = [
-    "不要修改旧接口",
-    "不要引入现代 C++ 特性",
-    "必须兼容 C++11"
+    "不要修改公共接口",
+    "不要引入新依赖",
+    "必须兼容现有构建环境"
 ]
 "#;
     let (config, warning) = Config::from_toml(text);
@@ -65,7 +65,7 @@ extra_rules = [
     assert_eq!(cp.depth, Some(Depth::Deep));
     assert_eq!(cp.scope, None);
     assert_eq!(cp.extra_rules.len(), 3);
-    assert_eq!(cp.extra_rules[2], "必须兼容 C++11");
+    assert_eq!(cp.extra_rules[2], "必须兼容现有构建环境");
     assert!(config.resolve_custom("missing").is_none());
     assert_eq!(config.resolved_customs().len(), 1);
 }

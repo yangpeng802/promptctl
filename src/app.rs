@@ -974,7 +974,7 @@ mod tests {
             permission: Some("minimal".to_string()),
             depth: Some("deep".to_string()),
             scope: Some("module".to_string()),
-            extra_rules: vec!["必须兼容 C++11".to_string()],
+            extra_rules: vec!["必须兼容现有构建环境".to_string()],
         });
         let mut app = App::new(config, History::default(), PresetHint::None);
         let idx = app
@@ -985,8 +985,8 @@ mod tests {
         app.sync();
         assert_eq!(app.depth, Depth::Deep);
         assert_eq!(app.scope, Scope::CurrentModule);
-        assert_eq!(app.extra_rules.text, "必须兼容 C++11");
+        assert_eq!(app.extra_rules.text, "必须兼容现有构建环境");
         assert!(!app.prompt.contains("legacy-fix"));
-        assert!(app.prompt.contains("必须兼容 C++11"));
+        assert!(app.prompt.contains("必须兼容现有构建环境"));
     }
 }
