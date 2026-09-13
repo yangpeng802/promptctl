@@ -88,6 +88,60 @@ pm fix "xxx" -p minimal -d deep -s auto
 pm fix "xxx" -c -q        # 只复制
 ```
 
+## OpenCode 集成（`/pm-fix`）
+
+仓库提供了 OpenCode 插件和自动安装脚本。安装后可以在 OpenCode 中直接
+输入 `/pm-fix <任务>`；插件调用现有的 Rust `pm` 生成完整 Prompt，并把它
+交给当前 Session 执行，不再需要复制粘贴。
+
+在仓库根目录运行：
+
+```sh
+./scripts/install-opencode-plugin.sh
+```
+
+脚本会：
+
+1. 检查 `pm` 是否在 `PATH` 中；缺失时通过 `cargo install --locked --path .`
+   安装；
+2. 将 `integrations/opencode/promptctl.ts` 安装到 OpenCode 全局插件目录；
+3. 已有同名插件内容不同时先创建带时间戳的备份。
+
+插件目录默认是 `~/.config/opencode/plugins/`，并支持
+`OPENCODE_CONFIG_DIR` 和 `XDG_CONFIG_HOME`。安装后重启 OpenCode，再运行：
+
+```text
+/pm-fix 修复 WritableCurveHandle 的 data race，只做最小修改
+```
+
+插件使用 OpenCode 的 `config` Hook 注册命令，并在
+`command.execute.before` Hook 中安全调用：
+
+```sh
+pm fix "<完整任务>" --no-copy
+```
+
+任务作为单独参数传递，不使用 `exec("...")` 拼接 shell 字符串。当前集成
+以 OpenCode 1.1.28 的插件接口为基准。
+
+如果 `pm` 已安装且只想更新插件：
+
+```sh
+./scripts/install-opencode-plugin.sh --plugin-only
+```
+
+强制从当前仓库安装/更新 `pm`：
+
+```sh
+./scripts/install-opencode-plugin.sh --install-pm
+```
+
+卸载插件（不会卸载 `pm`）：
+
+```sh
+./scripts/install-opencode-plugin.sh --uninstall
+```
+
 ## Preset
 
 | Preset | 默认权限 | 默认深度 | 默认范围 | 用途 |
@@ -269,4 +323,3 @@ cargo install --path .
   略有偏差（内容显示不受影响）
 - 英文模板是基本版本，丰富度不及中文模板
 - 不支持鼠标操作、主题系统、多份配置（均为有意裁剪）
-- 历史记录恢复时不包含约束勾选状态和文件列表（历史只存任务、四元参数与额外规则）
